@@ -45,9 +45,22 @@ ament_target_dependencies(camera_to_robot_tf_cpp_node
   tf2_ros
 )
 
+
+add_executable(robot_target_pose_cpp_node
+  src/robot_target_pose_cpp_node.cpp
+)
+
+ament_target_dependencies(robot_target_pose_cpp_node
+  rclcpp
+  std_msgs
+  geometry_msgs
+  visualization_msgs
+)
+
 install(TARGETS
   camera_only_scan_once_cpp_node
   camera_to_robot_tf_cpp_node
+  robot_target_pose_cpp_node
   DESTINATION lib/${PROJECT_NAME}
 )
 
