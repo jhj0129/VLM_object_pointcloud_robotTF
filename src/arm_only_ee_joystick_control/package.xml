@@ -24,4 +24,6 @@
   <export>
     <build_type>ament_cmake</build_type>
   </export>
+  <depend>moveit_ros_planning_interface</depend>
+  <depend>moveit_msgs</depend>
 </package>
