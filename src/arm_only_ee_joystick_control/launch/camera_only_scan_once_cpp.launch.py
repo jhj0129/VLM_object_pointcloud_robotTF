@@ -5,7 +5,7 @@ from launch_ros.actions import Node
 def generate_launch_description():
     return LaunchDescription([
         Node(
-            package="arm_only_ee_joystick_control",
+            package="vlm_object_pointcloud_robot_tf",
             executable="camera_only_scan_once_cpp_node",
             name="camera_only_scan_once_cpp_node",
             output="screen",

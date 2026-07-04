@@ -23,15 +23,11 @@ def generate_launch_description():
 
         # Measured camera origin relative to ARM_BASE_LINK.
         # Unit: meter
-        # x = -1 cm = -0.010 m
-        # y = (30 + 14.8) - 12.5 = 32.3 cm = 0.323 m
-        # z = (30 + 16 + 2.7) - 3 = 45.7 cm = 0.457 m
         DeclareLaunchArgument("camera_x", default_value="-0.010"),
         DeclareLaunchArgument("camera_y", default_value="0.323"),
         DeclareLaunchArgument("camera_z", default_value="0.457"),
 
         # Temporary optical-frame rotation.
-        # Tune later if camera axes are visually wrong.
         DeclareLaunchArgument("camera_qx", default_value="0.5"),
         DeclareLaunchArgument("camera_qy", default_value="-0.5"),
         DeclareLaunchArgument("camera_qz", default_value="0.5"),
@@ -56,7 +52,7 @@ def generate_launch_description():
         ),
 
         Node(
-            package="arm_only_ee_joystick_control",
+            package="vlm_object_pointcloud_robot_tf",
             executable="camera_to_robot_tf_cpp_node",
             name="camera_to_robot_tf_cpp_node",
             output="screen",

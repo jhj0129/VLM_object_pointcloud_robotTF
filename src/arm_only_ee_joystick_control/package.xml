@@ -1,8 +1,8 @@
 <?xml version="1.0"?>
 <package format="3">
-  <name>arm_only_ee_joystick_control</name>
+  <name>vlm_object_pointcloud_robot_tf</name>
   <version>0.2.0</version>
-  <description>Camera-only scan-once object pointcloud and robot-frame TF pipeline.</description>
+  <description>VLM object pointcloud and robot-frame TF pipeline.</description>
 
   <maintainer email="jhj0129@example.com">jhj0129</maintainer>
   <license>MIT</license>
