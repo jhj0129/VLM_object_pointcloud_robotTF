@@ -1,8 +1,8 @@
 <?xml version="1.0"?>
 <package format="3">
   <name>arm_only_ee_joystick_control</name>
-  <version>0.1.0</version>
-  <description>Stage 1 camera-only scan-once object pointcloud pipeline for VLM object perception.</description>
+  <version>0.2.0</version>
+  <description>Camera-only scan-once object pointcloud and robot-frame TF pipeline.</description>
 
   <maintainer email="jhj0129@example.com">jhj0129</maintainer>
   <license>MIT</license>
@@ -16,6 +16,8 @@
   <depend>geometry_msgs</depend>
   <depend>visualization_msgs</depend>
   <depend>opencv</depend>
+  <depend>tf2</depend>
+  <depend>tf2_ros</depend>
 
   <exec_depend>ros2launch</exec_depend>
 
