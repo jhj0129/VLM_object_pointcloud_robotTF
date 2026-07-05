@@ -13,12 +13,24 @@ def generate_launch_description():
         DeclareLaunchArgument("marker_topic", default_value="/vlm_moveit/target_markers"),
         DeclareLaunchArgument("target_frame", default_value="ARM_BASE_LINK"),
 
+        # Grasp target offset from detected object/grasp point.
         DeclareLaunchArgument("target_offset_x", default_value="0.0"),
         DeclareLaunchArgument("target_offset_y", default_value="0.0"),
-        DeclareLaunchArgument("target_offset_z", default_value="0.08"),
+        DeclareLaunchArgument("target_offset_z", default_value="0.0"),
 
+        # Side grasp:
+        # pregrasp = grasp + offset.
+        # Default means start 10 cm behind the object in -X and approach along +X.
+        DeclareLaunchArgument("side_grasp_mode", default_value="true"),
+        DeclareLaunchArgument("pregrasp_offset_x", default_value="-0.10"),
+        DeclareLaunchArgument("pregrasp_offset_y", default_value="0.0"),
+        DeclareLaunchArgument("pregrasp_offset_z", default_value="0.0"),
+
+        # Legacy top-down parameter, used only when side_grasp_mode=false.
         DeclareLaunchArgument("pregrasp_extra_z", default_value="0.10"),
 
+        # Desired gripper_tcp orientation in ARM_BASE_LINK.
+        # First test: identity orientation. Tune these after RViz check.
         DeclareLaunchArgument("target_qx", default_value="0.0"),
         DeclareLaunchArgument("target_qy", default_value="0.0"),
         DeclareLaunchArgument("target_qz", default_value="0.0"),
@@ -26,6 +38,7 @@ def generate_launch_description():
 
         DeclareLaunchArgument("target_marker_scale", default_value="0.025"),
         DeclareLaunchArgument("pregrasp_marker_scale", default_value="0.020"),
+        DeclareLaunchArgument("tcp_axis_marker_length", default_value="0.10"),
 
         Node(
             package="vlm_object_pointcloud_robot_tf",
@@ -46,6 +59,11 @@ def generate_launch_description():
                     "target_offset_y": ParameterValue(LaunchConfiguration("target_offset_y"), value_type=float),
                     "target_offset_z": ParameterValue(LaunchConfiguration("target_offset_z"), value_type=float),
 
+                    "side_grasp_mode": ParameterValue(LaunchConfiguration("side_grasp_mode"), value_type=bool),
+                    "pregrasp_offset_x": ParameterValue(LaunchConfiguration("pregrasp_offset_x"), value_type=float),
+                    "pregrasp_offset_y": ParameterValue(LaunchConfiguration("pregrasp_offset_y"), value_type=float),
+                    "pregrasp_offset_z": ParameterValue(LaunchConfiguration("pregrasp_offset_z"), value_type=float),
+
                     "pregrasp_extra_z": ParameterValue(LaunchConfiguration("pregrasp_extra_z"), value_type=float),
 
                     "target_qx": ParameterValue(LaunchConfiguration("target_qx"), value_type=float),
@@ -55,6 +73,7 @@ def generate_launch_description():
 
                     "target_marker_scale": ParameterValue(LaunchConfiguration("target_marker_scale"), value_type=float),
                     "pregrasp_marker_scale": ParameterValue(LaunchConfiguration("pregrasp_marker_scale"), value_type=float),
+                    "tcp_axis_marker_length": ParameterValue(LaunchConfiguration("tcp_axis_marker_length"), value_type=float),
                 }
             ],
         )

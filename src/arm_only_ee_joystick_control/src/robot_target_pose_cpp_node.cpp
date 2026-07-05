@@ -1,6 +1,7 @@
 #include <chrono>
 #include <mutex>
 #include <string>
+#include <cstdio>
 
 #include "rclcpp/rclcpp.hpp"
 
@@ -31,12 +32,24 @@ public:
 
     target_frame_ = declare_parameter<std::string>("target_frame", "ARM_BASE_LINK");
 
+    // Object/grasp point offset in ARM_BASE_LINK.
     target_offset_x_ = declare_parameter<double>("target_offset_x", 0.0);
     target_offset_y_ = declare_parameter<double>("target_offset_y", 0.0);
-    target_offset_z_ = declare_parameter<double>("target_offset_z", 0.08);
+    target_offset_z_ = declare_parameter<double>("target_offset_z", 0.0);
 
+    // New side-grasp mode:
+    //   grasp    = object point + target_offset
+    //   pregrasp = grasp + pregrasp_offset
+    // Default: approach from -X direction by 10 cm, then move +X into the object.
+    side_grasp_mode_ = declare_parameter<bool>("side_grasp_mode", true);
+    pregrasp_offset_x_ = declare_parameter<double>("pregrasp_offset_x", -0.10);
+    pregrasp_offset_y_ = declare_parameter<double>("pregrasp_offset_y", 0.0);
+    pregrasp_offset_z_ = declare_parameter<double>("pregrasp_offset_z", 0.0);
+
+    // Legacy top-down mode support. Used only when side_grasp_mode=false.
     pregrasp_extra_z_ = declare_parameter<double>("pregrasp_extra_z", 0.10);
 
+    // Desired gripper_tcp orientation in ARM_BASE_LINK.
     qx_ = declare_parameter<double>("target_qx", 0.0);
     qy_ = declare_parameter<double>("target_qy", 0.0);
     qz_ = declare_parameter<double>("target_qz", 0.0);
@@ -44,6 +57,7 @@ public:
 
     target_marker_scale_ = declare_parameter<double>("target_marker_scale", 0.025);
     pregrasp_marker_scale_ = declare_parameter<double>("pregrasp_marker_scale", 0.020);
+    tcp_axis_marker_length_ = declare_parameter<double>("tcp_axis_marker_length", 0.10);
 
     auto qos = rclcpp::QoS(rclcpp::KeepLast(1)).reliable().transient_local();
 
@@ -69,14 +83,28 @@ public:
     RCLCPP_INFO(get_logger(), "input_point_topic=%s", input_point_topic_.c_str());
     RCLCPP_INFO(get_logger(), "target_pose_topic=%s", target_pose_topic_.c_str());
     RCLCPP_INFO(get_logger(), "pregrasp_pose_topic=%s", pregrasp_pose_topic_.c_str());
-    RCLCPP_INFO(get_logger(), "target_offset_z=%.3f", target_offset_z_);
-    RCLCPP_INFO(get_logger(), "pregrasp_extra_z=%.3f", pregrasp_extra_z_);
+    RCLCPP_INFO(get_logger(), "side_grasp_mode=%s", side_grasp_mode_ ? "true" : "false");
+    RCLCPP_INFO(
+      get_logger(),
+      "target_offset=(%.3f, %.3f, %.3f)",
+      target_offset_x_,
+      target_offset_y_,
+      target_offset_z_);
+    RCLCPP_INFO(
+      get_logger(),
+      "pregrasp_offset=(%.3f, %.3f, %.3f)",
+      pregrasp_offset_x_,
+      pregrasp_offset_y_,
+      pregrasp_offset_z_);
+    RCLCPP_INFO(
+      get_logger(),
+      "target quaternion=(%.6f, %.6f, %.6f, %.6f)",
+      qx_, qy_, qz_, qw_);
   }
 
 private:
-  geometry_msgs::msg::PoseStamped makePose(
-    const geometry_msgs::msg::PointStamped & point,
-    double extra_z)
+  geometry_msgs::msg::PoseStamped makeGraspPose(
+    const geometry_msgs::msg::PointStamped & point)
   {
     geometry_msgs::msg::PoseStamped pose;
     pose.header.stamp = get_clock()->now();
@@ -84,12 +112,33 @@ private:
 
     pose.pose.position.x = point.point.x + target_offset_x_;
     pose.pose.position.y = point.point.y + target_offset_y_;
-    pose.pose.position.z = point.point.z + target_offset_z_ + extra_z;
+    pose.pose.position.z = point.point.z + target_offset_z_;
 
     pose.pose.orientation.x = qx_;
     pose.pose.orientation.y = qy_;
     pose.pose.orientation.z = qz_;
     pose.pose.orientation.w = qw_;
+
+    return pose;
+  }
+
+  geometry_msgs::msg::PoseStamped makePregraspPose(
+    const geometry_msgs::msg::PoseStamped & grasp)
+  {
+    geometry_msgs::msg::PoseStamped pose = grasp;
+    pose.header.stamp = get_clock()->now();
+
+    if (side_grasp_mode_) {
+      pose.pose.position.x = grasp.pose.position.x + pregrasp_offset_x_;
+      pose.pose.position.y = grasp.pose.position.y + pregrasp_offset_y_;
+      pose.pose.position.z = grasp.pose.position.z + pregrasp_offset_z_;
+    } else {
+      // Legacy top-down behavior.
+      pose.pose.position.z = grasp.pose.position.z + pregrasp_extra_z_;
+    }
+
+    // Critical: keep the exact same orientation for tunnel-like side approach.
+    pose.pose.orientation = grasp.pose.orientation;
 
     return pose;
   }
@@ -124,7 +173,7 @@ private:
     return marker;
   }
 
-  visualization_msgs::msg::Marker makeArrowMarker(
+  visualization_msgs::msg::Marker makeLineArrowMarker(
     const geometry_msgs::msg::PoseStamped & pregrasp,
     const geometry_msgs::msg::PoseStamped & target)
   {
@@ -160,8 +209,40 @@ private:
     return marker;
   }
 
+  visualization_msgs::msg::Marker makeTcpXAxisMarker(
+    const geometry_msgs::msg::PoseStamped & pose,
+    const std::string & ns,
+    int id,
+    double r,
+    double g,
+    double b)
+  {
+    visualization_msgs::msg::Marker marker;
+    marker.header = pose.header;
+    marker.ns = ns;
+    marker.id = id;
+    marker.type = visualization_msgs::msg::Marker::ARROW;
+    marker.action = visualization_msgs::msg::Marker::ADD;
+
+    // ARROW marker with pose and no points points along local +X.
+    // This visualizes the gripper_tcp +X direction.
+    marker.pose = pose.pose;
+
+    marker.scale.x = tcp_axis_marker_length_;
+    marker.scale.y = 0.010;
+    marker.scale.z = 0.018;
+
+    marker.color.r = r;
+    marker.color.g = g;
+    marker.color.b = b;
+    marker.color.a = 0.95;
+
+    return marker;
+  }
+
   visualization_msgs::msg::Marker makeTextMarker(
-    const geometry_msgs::msg::PoseStamped & target)
+    const geometry_msgs::msg::PoseStamped & target,
+    const geometry_msgs::msg::PoseStamped & pregrasp)
   {
     visualization_msgs::msg::Marker marker;
     marker.header = target.header;
@@ -171,7 +252,7 @@ private:
     marker.action = visualization_msgs::msg::Marker::ADD;
 
     marker.pose = target.pose;
-    marker.pose.position.z += 0.04;
+    marker.pose.position.z += 0.05;
 
     marker.scale.z = 0.035;
 
@@ -180,14 +261,17 @@ private:
     marker.color.b = 1.0;
     marker.color.a = 0.95;
 
-    char buf[256];
+    char buf[512];
     std::snprintf(
       buf,
       sizeof(buf),
-      "target pose\\n%.3f %.3f %.3f",
+      "side grasp target\nG %.3f %.3f %.3f\nP %.3f %.3f %.3f",
       target.pose.position.x,
       target.pose.position.y,
-      target.pose.position.z);
+      target.pose.position.z,
+      pregrasp.pose.position.x,
+      pregrasp.pose.position.y,
+      pregrasp.pose.position.z);
 
     marker.text = buf;
 
@@ -200,6 +284,7 @@ private:
   {
     visualization_msgs::msg::MarkerArray arr;
 
+    // Red grasp target.
     arr.markers.push_back(
       makeSphereMarker(
         target,
@@ -210,6 +295,7 @@ private:
         0.0,
         0.0));
 
+    // Cyan pregrasp.
     arr.markers.push_back(
       makeSphereMarker(
         pregrasp,
@@ -220,8 +306,29 @@ private:
         0.7,
         1.0));
 
-    arr.markers.push_back(makeArrowMarker(pregrasp, target));
-    arr.markers.push_back(makeTextMarker(target));
+    // Blue arrow from pregrasp to grasp.
+    arr.markers.push_back(makeLineArrowMarker(pregrasp, target));
+
+    // Green arrows showing local gripper_tcp +X at both poses.
+    arr.markers.push_back(
+      makeTcpXAxisMarker(
+        target,
+        "target_tcp_x_axis",
+        30,
+        0.0,
+        1.0,
+        0.0));
+
+    arr.markers.push_back(
+      makeTcpXAxisMarker(
+        pregrasp,
+        "pregrasp_tcp_x_axis",
+        31,
+        0.0,
+        0.8,
+        0.8));
+
+    arr.markers.push_back(makeTextMarker(target, pregrasp));
 
     return arr;
   }
@@ -254,8 +361,8 @@ private:
 
     std::lock_guard<std::mutex> lock(mutex_);
 
-    target_pose_ = makePose(*msg, 0.0);
-    pregrasp_pose_ = makePose(*msg, pregrasp_extra_z_);
+    target_pose_ = makeGraspPose(*msg);
+    pregrasp_pose_ = makePregraspPose(target_pose_);
 
     has_result_ = true;
 
@@ -263,17 +370,25 @@ private:
 
     RCLCPP_INFO(
       get_logger(),
-      "target pose: x=%.3f, y=%.3f, z=%.3f",
+      "SIDE GRASP target: frame=%s, pos=(%.3f, %.3f, %.3f), quat=(%.4f %.4f %.4f %.4f)",
+      target_pose_.header.frame_id.c_str(),
       target_pose_.pose.position.x,
       target_pose_.pose.position.y,
-      target_pose_.pose.position.z);
+      target_pose_.pose.position.z,
+      target_pose_.pose.orientation.x,
+      target_pose_.pose.orientation.y,
+      target_pose_.pose.orientation.z,
+      target_pose_.pose.orientation.w);
 
     RCLCPP_INFO(
       get_logger(),
-      "pregrasp pose: x=%.3f, y=%.3f, z=%.3f",
+      "SIDE GRASP pregrasp: pos=(%.3f, %.3f, %.3f), offset=(%.3f, %.3f, %.3f)",
       pregrasp_pose_.pose.position.x,
       pregrasp_pose_.pose.position.y,
-      pregrasp_pose_.pose.position.z);
+      pregrasp_pose_.pose.position.z,
+      pregrasp_pose_.pose.position.x - target_pose_.pose.position.x,
+      pregrasp_pose_.pose.position.y - target_pose_.pose.position.y,
+      pregrasp_pose_.pose.position.z - target_pose_.pose.position.z);
   }
 
   void republish()
@@ -294,6 +409,12 @@ private:
   double target_offset_x_;
   double target_offset_y_;
   double target_offset_z_;
+
+  bool side_grasp_mode_;
+  double pregrasp_offset_x_;
+  double pregrasp_offset_y_;
+  double pregrasp_offset_z_;
+
   double pregrasp_extra_z_;
 
   double qx_;
@@ -303,6 +424,7 @@ private:
 
   double target_marker_scale_;
   double pregrasp_marker_scale_;
+  double tcp_axis_marker_length_;
 
   rclcpp::Subscription<geometry_msgs::msg::PointStamped>::SharedPtr point_sub_;
   rclcpp::Publisher<geometry_msgs::msg::PoseStamped>::SharedPtr target_pose_pub_;
