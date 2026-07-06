@@ -98,6 +98,18 @@ ament_target_dependencies(moveit_plan_side_grasp_cpp_node
   moveit_msgs
 )
 
+
+add_executable(moveit_ik_workspace_probe_cpp_node
+  src/moveit_ik_workspace_probe_cpp_node.cpp
+)
+
+ament_target_dependencies(moveit_ik_workspace_probe_cpp_node
+  rclcpp
+  geometry_msgs
+  visualization_msgs
+  moveit_ros_planning_interface
+)
+
 install(TARGETS
   camera_only_scan_once_cpp_node
   camera_to_robot_tf_cpp_node
@@ -105,6 +117,7 @@ install(TARGETS
   moveit_plan_to_pose_cpp_node
   moveit_plan_sequence_cpp_node
   moveit_plan_side_grasp_cpp_node
+  moveit_ik_workspace_probe_cpp_node
   DESTINATION lib/${PROJECT_NAME}
 )
 
@@ -117,5 +130,24 @@ install(DIRECTORY
   launch
   DESTINATION share/${PROJECT_NAME}
 )
+
+
+add_executable(moveit_grasp_candidate_plan_cpp_node
+  src/moveit_grasp_candidate_plan_cpp_node.cpp
+)
+
+ament_target_dependencies(moveit_grasp_candidate_plan_cpp_node
+  rclcpp
+  geometry_msgs
+  std_msgs
+  visualization_msgs
+  moveit_ros_planning_interface
+)
+
+install(TARGETS
+  moveit_grasp_candidate_plan_cpp_node
+  DESTINATION lib/${PROJECT_NAME}
+)
+
 
 ament_package()
