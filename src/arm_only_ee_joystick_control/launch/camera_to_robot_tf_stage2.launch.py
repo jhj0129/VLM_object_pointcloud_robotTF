@@ -23,15 +23,15 @@ def generate_launch_description():
 
         # Measured camera origin relative to ARM_BASE_LINK.
         # Unit: meter
-        DeclareLaunchArgument("camera_x", default_value="-0.010"),
-        DeclareLaunchArgument("camera_y", default_value="0.323"),
-        DeclareLaunchArgument("camera_z", default_value="0.457"),
+        DeclareLaunchArgument("camera_x", default_value="-0.002233527"),
+        DeclareLaunchArgument("camera_y", default_value="0.324404276"),
+        DeclareLaunchArgument("camera_z", default_value="0.338933329"),
 
         # Temporary optical-frame rotation.
-        DeclareLaunchArgument("camera_qx", default_value="0.5"),
-        DeclareLaunchArgument("camera_qy", default_value="-0.5"),
-        DeclareLaunchArgument("camera_qz", default_value="0.5"),
-        DeclareLaunchArgument("camera_qw", default_value="-0.5"),
+        DeclareLaunchArgument("camera_qx", default_value="-0.577141787410"),
+        DeclareLaunchArgument("camera_qy", default_value="0.599430095287"),
+        DeclareLaunchArgument("camera_qz", default_value="-0.402919282376"),
+        DeclareLaunchArgument("camera_qw", default_value="0.381112804796"),
 
         Node(
             package="tf2_ros",
